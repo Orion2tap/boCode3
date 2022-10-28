@@ -1,0 +1,67 @@
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="boGroup.boSSM.mapper.TopicCommentMapper">
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        <!-- 传参方式1，传入xxxModel, MyBatis 将 xxxModel.xxx 绑定到 #{xxx} -->
+        <!-- useGeneratedKeys="true" keyProperty="id" 把数据库返回的 id 赋值给 xxxModel.id -->
+        INSERT INTO ssm.topiccomment (content, topicId, userId, createdTime, updatedTime, floor) VALUES (#{content}, #{topicId}, #{userId}, #{createdTime}, #{updatedTime}, #{floor})
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM ssm.topiccomment WHERE id = #{id}
+    </delete>
+
+    <update id="update">
+        UPDATE ssm.topiccomment SET content = #{content}, updatedTime = #{updatedTime} WHERE id = #{id}
+    </update>
+
+    <!-- commentId ⇉ comment -->
+    <select id="selectOne" resultType="boGroup.boSSM.model.TopicCommentModel">
+        <!-- 传参方式2: 直接传入 id, 这个 id 会被绑定到 #{id} -->
+        SELECT * FROM ssm.topiccomment WHERE id = #{id}
+    </select>
+
+    <!-- topicId ⇉ latestComment -->
+    <select id="latestComment" resultType="boGroup.boSSM.model.TopicCommentModel">
+        select *
+        from ssm.topiccomment
+        where topicId = #{topicId}
+        order by updatedTime DESC limit 1;
+    </select>
+
+    <!-- () ⇉ comments -->
+    <select id="selectAll" resultType="boGroup.boSSM.model.TopicCommentModel">
+        SELECT * FROM ssm.topiccomment
+    </select>
+
+    <!-- topicId ⇉ comments + comments.user -->
+    <resultMap id="selectAllByTopicIdMap" type="boGroup.boSSM.model.TopicCommentModel" >
+        <!-- xxxModel 的属性映射到 DB 查询结果 -->
+        <id property="id" column="id" />
+        <result property="content" column="content" />
+        <result property="userId" column="userId" />
+        <result property="updatedTime" column="updatedTime" />
+        <result property="floor" column="floor" />
+
+        <association property="user" javaType="boGroup.boSSM.model.UserModel">
+            <result property="username" column="u_username" />
+            <result property="avatar" column="u_avatar" />
+        </association>
+    </resultMap>
+    <select id="selectAllByTopicId" resultMap="selectAllByTopicIdMap">
+        select
+            topiccomment.id,
+            topiccomment.content,
+            topiccomment.userId,
+            topiccomment.updatedTime,
+            topiccomment.floor,
+            user.username as u_username,
+            user.avatar as u_avatar
+        from  topiccomment
+                  join user
+                       on topiccomment.userId = user.id
+        where topiccomment.topicId = #{id}
+    </select>
+</mapper>

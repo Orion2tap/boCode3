@@ -1,0 +1,4 @@
+gradle/wrapper/gradle-6.5-all.zip
+build/
+.gradle/
+src/main/resources/application.properties

@@ -1,0 +1,426 @@
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="boGroup.boSSM.mapper.TopicMapper">
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        <!-- 传参方式1，传入xxxModel, MyBatis 将 xxxModel.xxx 绑定到 #{xxx} -->
+        <!-- useGeneratedKeys="true" keyProperty="id" 把数据库返回的 id 赋值给 xxxModel.id -->
+        INSERT INTO topic
+            (title, content, userId, boardId, createdTime, updatedTime)
+        VALUES
+        (#{title}, #{content}, #{userId}, #{boardId}, #{createdTime}, #{updatedTime})
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM topic WHERE id = #{id}
+    </delete>
+
+    <update id="update">
+        UPDATE
+            topic
+        SET
+            title = #{title},
+            content = #{content},
+            boardId = #{boardId},
+            updatedTime = #{updatedTime}
+        WHERE id = #{id}
+    </update>
+
+    <!-- userId ⇉ allCreatedTopics -->
+    <select id="allCreatedTopics" resultType="boGroup.boSSM.model.TopicModel">
+        select
+            id,
+            title,
+            updatedTime
+        from topic
+        where topic.userId = #{userId}
+        order by updatedTime desc
+    </select>
+
+    <!-- userId ⇉ allCommentedTopics -->
+    <select id="allCommentedTopics" resultType="boGroup.boSSM.model.TopicModel">
+        select
+            *
+        from topic
+                 left join topiccomment
+                           on topic.id = topiccomment.topicId
+        where topiccomment.userId = #{userId}
+        group by topic.id desc
+    </select>
+
+    <!-- userId ⇉ allStaredTopics -->
+    <select id="allStaredTopics" resultType="boGroup.boSSM.model.TopicModel">
+        select * from topicstar where userId = #{userId}
+    </select>
+
+    <!-- (userId, limit, offset) ⇉ pageCreatedTopics -->
+    <select id="pageCreatedTopics" resultType="boGroup.boSSM.model.TopicModel">
+        select
+            id,
+            title,
+            createdTime,
+            (select
+                 count(*)
+             from topiccomment
+             where topicId = topic.id) as count,
+            (select
+                 user.avatar
+             from topiccomment
+                      join user
+                           on topiccomment.userId = user.id
+             where topiccomment.topicId = topic.id
+             order by topiccomment.updatedTime desc
+             limit 1) as newReviewerAvatar
+        from topic
+        where topic.userId = #{userId}
+        group by createdTime desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <!-- (userId, limit, offset) ⇉ pageCommentedTopics -->
+    <resultMap id="pageCommentedTopicsMap" type="boGroup.boSSM.model.TopicModel" >
+        <!-- xxxModel 的属性映射到 DB 查询结果 -->
+        <id property="id" column="id" />
+        <result property="title" column="title" />
+        <result property="count" column="count" />
+        <result property="newReviewerAvatar" column="newReviewerAvatar" />
+
+        <association property="latestComment" javaType="boGroup.boSSM.model.TopicCommentModel" >
+            <result property="updatedTime" column="c_updatedTime" />
+        </association>
+
+        <association property="user" javaType="boGroup.boSSM.model.UserModel" >
+            <result property="username" column="u_username" />
+            <result property="avatar" column="u_avatar" />
+        </association>
+    </resultMap>
+    <select id="pageCommentedTopics" resultMap="pageCommentedTopicsMap">
+        select
+            topic.id,
+            topic.title,
+            (select
+                 count(*)
+             from topiccomment
+             where topicId = topic.id) as count,
+            (select
+                 user.avatar
+             from topiccomment
+                      join user
+                           on topiccomment.userId = user.id
+             where topiccomment.topicId = topic.id
+             order by topiccomment.updatedTime desc
+             limit 1) as newReviewerAvatar,
+            topiccomment.updatedTime as c_updatedTime,
+            (select
+                 avatar
+             from user
+             where topic.userId = user.id) as u_avatar,
+            (select
+                 username
+             from user
+             where topic.userId = user.id) as u_username
+        from topic
+                 left join topiccomment
+                           on topic.id = topiccomment.topicId
+        where topiccomment.userId = #{userId}
+        group by topic.id desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <!-- (userId, limit, offset) ⇉ pageStaredTopics -->
+    <select id="pageStaredTopics" resultType="boGroup.boSSM.model.TopicModel">
+        select
+            topic.id,
+            topic.title,
+            topicstar.staredTime as staredTime
+        from topicstar
+                 join topic
+                      on topicstar.topicId = topic.id
+        where topicstar.userId = #{userId}
+        order by staredTime desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <!-- () ⇉ allTopics -->
+    <select id="selectAll" resultType="boGroup.boSSM.model.TopicModel">
+        SELECT * FROM topic
+    </select>
+
+    <!-- (limit, offset) ⇉ pageTopics -->
+    <resultMap id="pageTopicsMap" type="boGroup.boSSM.model.TopicModel" >
+        <!-- xxxModel 的属性映射到 DB 查询结果 -->
+        <id property="id" column="id" />
+        <result property="title" column="title" />
+        <result property="count" column="count" />
+        <result property="newReviewerAvatar" column="newReviewerAvatar" />
+
+        <association property="latestComment" javaType="boGroup.boSSM.model.TopicCommentModel" >
+            <result property="updatedTime" column="updatedTime" />
+        </association>
+
+        <association property="user" javaType="boGroup.boSSM.model.UserModel" >
+            <result property="avatar" column="u_avatar" />
+            <result property="username" column="u_username" />
+        </association>
+    </resultMap>
+    <select id="pageTopics" resultMap="pageTopicsMap">
+        select
+            topic.id as id,
+            title,
+            (select
+                 count(*)
+             from topiccomment
+             where topicId = topic.id) as count,
+            (select
+                 user.avatar
+             from topiccomment
+                 join user
+                     on topiccomment.userId = user.id
+             where topiccomment.topicId = topic.id
+             order by topiccomment.updatedTime desc
+             limit 1) as newReviewerAvatar,
+            MAX(IFNULL(topiccomment.updatedTime, topic.createdTime)) as updatedTime,
+            user.avatar as u_avatar,
+            user.username as u_username
+        from topic
+                 join user
+                      on topic.userId = user.id
+                 left join topiccomment
+                           on topic.id = topiccomment.topicId
+        group by id
+        order by updatedTime desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <!-- (boardId, limit, offset) ⇉ pageTopicsByBoardId -->
+    <resultMap id="pageTopicsByBoardIdMap" type="boGroup.boSSM.model.TopicModel" >
+        <!-- xxxModel 的属性映射到 DB 查询结果 -->
+        <id property="id" column="id" />
+        <result property="title" column="title" />
+        <result property="count" column="count" />
+        <result property="newReviewerAvatar" column="newReviewerAvatar" />
+
+        <association property="latestComment" javaType="boGroup.boSSM.model.TopicCommentModel" >
+            <result property="updatedTime" column="updatedTime" />
+        </association>
+
+        <association property="user" javaType="boGroup.boSSM.model.UserModel" >
+            <result property="avatar" column="u_avatar" />
+            <result property="username" column="u_username" />
+        </association>
+    </resultMap>
+    <select id="pageTopicsByBoardId" resultMap="pageTopicsByBoardIdMap">
+        select
+            topic.id as id,
+            title,
+            (select
+                 count(*)
+             from topiccomment
+             where topicId = topic.id) as count,
+            (select
+                 user.avatar
+             from topiccomment
+                      join user
+                           on topiccomment.userId = user.id
+             where topiccomment.topicId = topic.id
+             order by topiccomment.updatedTime desc
+             limit 1) as newReviewerAvatar,
+            MAX(IFNULL(topiccomment.updatedTime, topic.createdTime)) as updatedTime,
+            user.avatar as u_avatar,
+            user.username as u_username
+        from topic
+                 join user
+                      on topic.userId = user.id
+                 left join topiccomment
+                           on topic.id = topiccomment.topicId
+        where topic.boardId = #{boardId}
+        group by id
+        order by updatedTime desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <!-- () ⇉ noReplyTopics -->
+    <select id="noReplyTopics" resultType="boGroup.boSSM.model.TopicModel">
+        select
+            *
+        from (
+             select
+                 id,
+                 title,
+                 createdTime,
+                 (select
+                      count(*)
+                  from topiccomment
+                  where topicId = topic.id
+                 ) as count
+             from topic
+             ) as t
+        where count = 0
+        order by createdTime desc
+    </select>
+
+    <!-- topicId ⇉ topic -->
+    <select id="selectOne" resultType="boGroup.boSSM.model.TopicModel">
+        <!-- 传参方式2: 直接传入 id, 这个 id 会被绑定到 #{id} -->
+        SELECT * FROM topic WHERE id = #{id}
+    </select>
+
+    <!-- topicId ⇉ topic + topic.board -->
+    <resultMap id="selectOneWithBoardMap" type="boGroup.boSSM.model.TopicModel" >
+        <!-- xxxModel 的属性映射到 DB 查询结果 -->
+        <id property="id" column="id" />
+        <result property="title" column="title" />
+        <result property="content" column="content" />
+
+        <association property="board" javaType="boGroup.boSSM.model.BoardModel">
+            <id property="id" column="b_id" />
+            <result property="name" column="b_name" />
+        </association>
+    </resultMap>
+    <select id="selectOneWithBoard" resultMap="selectOneWithBoardMap">
+        select
+            topic.id,
+            topic.title,
+            topic.content,
+            board.id as b_id,
+            board.name as b_name
+        from  topic
+              join board
+                   on topic.boardId = board.id
+        where topic.id = #{id}
+    </select>
+
+    <!-- topicId ⇉ topic + topic.user + topic.board -->
+    <resultMap id="selectOneWithUserAndBoardMap" type="boGroup.boSSM.model.TopicModel" >
+        <!-- xxxModel 的属性映射到 DB 查询结果 -->
+        <id property="id" column="id" />
+        <result property="title" column="title" />
+        <result property="content" column="content" />
+        <result property="userId" column="userId" />
+        <result property="createdTime" column="createdTime" />
+
+        <association property="user" javaType="boGroup.boSSM.model.UserModel">
+            <result property="username" column="u_username" />
+        </association>
+
+        <association property="board" javaType="boGroup.boSSM.model.BoardModel">
+            <result property="name" column="b_name" />
+        </association>
+    </resultMap>
+    <select id="selectOneWithUserAndBoard" resultMap="selectOneWithUserAndBoardMap">
+        select
+            topic.id,
+            topic.title,
+            topic.content,
+            topic.userId,
+            topic.createdTime,
+            user.username as u_username,
+            board.name as b_name
+        from  topic
+                  join user
+                       on topic.userId = user.id
+                  join board
+                       on topic.boardId = board.id
+        where topic.id = #{id}
+    </select>
+
+    <!-- topicId ⇉ topic + topic.comments -->
+    <resultMap id="selectOneWithCommentsMap" type="boGroup.boSSM.model.TopicModel" >
+        <!-- xxxModel 的属性映射到 DB 查询结果 -->
+        <id property="id" column="id" />
+        <result property="title" column="title" />
+        <result property="content" column="content" />
+
+        <collection property="comments" ofType="boGroup.boSSM.model.TopicCommentModel" >
+            <id property="id" column="c_id" />
+            <result property="content" column="c_content" />
+        </collection>
+    </resultMap>
+    <select id="selectOneWithComments" resultMap="selectOneWithCommentsMap">
+        select
+            topic.id,
+            topic.title,
+            topic.content,
+            topiccomment.id as c_id,
+            topiccomment.content as c_content
+        from  topic
+            left join topiccomment
+                on topic.id = topiccomment.topicId
+        where topic.id = #{id}
+    </select>
+
+    <!-- topicId ⇉ topic + topic.comments + topic.comments.user -->
+    <resultMap id="selectOneWithCommentsAndUserMap" type="boGroup.boSSM.model.TopicModel" >
+        <!--贴子数据-->
+        <!-- xxxModel 的属性映射到 DB 查询结果 -->
+        <id property="id" column="id" />
+        <result property="title" column="title" />
+        <result property="content" column="content" />
+        <result property="userId" column="userId" />
+        <result property="createdTime" column="createdTime" />
+
+        <!--评论数据-->
+        <!--因为是 ArrayList<TopicCommentModel> 所以使用 <collection> 标签-->
+        <collection property="comments" ofType="boGroup.boSSM.model.TopicCommentModel" >
+            <id property="id" column="c_id" />
+            <result property="content" column="c_content" />
+            <result property="userId" column="c_userId" />
+            <result property="createdTime" column="c_createdTime" />
+            <result property="updatedTime" column="c_updatedTime" />
+            <!--因为是单个的 UserModel 所以使用 <association> 标签-->
+            <association property="user" javaType="boGroup.boSSM.model.UserModel">
+                <result property="username" column="u_username" />
+            </association>
+        </collection>
+    </resultMap>
+    <select id="selectOneWithCommentsAndUser" resultMap="selectOneWithCommentsAndUserMap">
+        <!--使用 left join 没有评论或发帖人也能取到贴子-->
+        select
+            topic.id,
+            topic.title,
+            topic.content,
+            topic.userId,
+            topic.createdTime,
+            topiccomment.id as c_id,
+            topiccomment.content as c_content,
+            topiccomment.userId as c_userId,
+            topiccomment.createdTime as c_createdTime,
+            topiccomment.updatedTime as c_updatedTime,
+            user.username as u_username
+        from  topic
+                  left join topiccomment
+                            on topic.id = topiccomment.topicId
+                  left join user
+                            on user.id = topiccomment.userId
+        where topic.id = #{id}
+    </select>
+
+    <!-- (userId, topicId) ⇉ () [star topic] -->
+    <insert id="star">
+        INSERT INTO topicstar
+            (userId, topicId, staredTime)
+        VALUES
+            (#{userId}, #{topicId}, #{staredTime})
+    </insert>
+
+    <!-- (userId, topicId) ⇉ () [unstar topic] -->
+    <delete id="unstar">
+        DELETE FROM topicstar WHERE userId=#{userId} AND topicId=#{topicId}
+    </delete>
+
+    <!-- (userId, topicId) ⇉ result [star check] -->
+    <select id="starCheck" resultType="int">
+        SELECT count(*) FROM topicstar WHERE userId=#{userId} AND topicId=#{topicId}
+    </select>
+
+    <!-- () ⇉ boards -->
+    <select id="selectAllBoards" resultType="boGroup.boSSM.model.BoardModel">
+        SELECT * FROM board
+    </select>
+
+    <!-- boardId ⇉ topics -->
+    <select id="allTopicsByBoardId" resultType="boGroup.boSSM.model.TopicModel">
+        SELECT * FROM topic WHERE boardId = #{id}
+    </select>
+</mapper>

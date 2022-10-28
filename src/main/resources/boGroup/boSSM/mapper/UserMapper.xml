@@ -1,0 +1,111 @@
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="boGroup.boSSM.mapper.UserMapper">
+    <!-- 传参方式2，传入xxModel, MyBatis 将 xxModel.xxx 绑定到 #{xxx} -->
+    <!-- useGeneratedKeys="true" keyProperty="id" 把数据库返回的 id 赋值给 xxModel.id -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" >
+        INSERT INTO user
+            (username,
+             password,
+             role,
+             email,
+             registrationTime)
+        VALUES
+            (#{username},
+             #{password},
+             #{role},
+             #{email},
+             #{registrationTime})
+    </insert>
+
+    <delete id="delete">
+        DELETE
+            FROM user
+        WHERE id = #{id}
+    </delete>
+
+    <!-- 更新用户名和密码 -->
+    <update id="update">
+        UPDATE user
+            SET site = #{site},
+                location = #{location},
+                github = #{github},
+                note = #{note}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新头像 -->
+    <update id="updateAvatar">
+        UPDATE user
+        SET avatar = #{avatar}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 更新密码 -->
+    <update id="updatePassword">
+        UPDATE user
+        SET password = #{password}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 传参方式1: 直接传入 id, 这个 id 会被绑定到 #{id} -->
+    <select id="selectOneById" resultType="boGroup.boSSM.model.UserModel">
+        SELECT *
+            FROM user
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectOneByUsername" resultType="boGroup.boSSM.model.UserModel">
+        SELECT *
+        FROM user
+        WHERE username = #{username}
+    </select>
+
+    <select id="selectAll" resultType="boGroup.boSSM.model.UserModel">
+        SELECT *
+            FROM user
+    </select>
+
+    <!-- rankingUsers -->
+    <resultMap id="rankingUsersMap" type="boGroup.boSSM.model.UserModel" >
+        <!-- xxxModel 的属性映射到 DB 查询结果 -->
+        <id property="id" column="id" />
+        <result property="username" column="username" />
+        <result property="score" column="score" />
+        <result property="createdTopicsCount" column="createdTopicsCount" />
+        <result property="createdCommentsCount" column="createdCommentsCount" />
+    </resultMap>
+    <select id="rankingUsers" resultMap="rankingUsersMap">
+        SELECT
+            user.id,
+            user.username,
+            (createdTopicsCount * 5 + createdCommentsCount * 2) AS score,
+            createdTopicsCount,
+            createdCommentsCount
+        FROM
+            (SELECT
+                 userId, count(*) AS createdTopicsCount
+             FROM
+                 topic
+             GROUP BY userId) AS t1
+        JOIN
+            (SELECT
+                 userId, count(*) AS createdCommentsCount
+             FROM
+                 topiccomment
+             GROUP BY userId) AS t2
+        ON t1.userId = t2.userId
+        JOIN
+            user
+        ON t1.userId = user.id
+        ORDER BY score DESC
+        LIMIT #{limit}
+    </select>
+
+
+
+
+
+</mapper>
